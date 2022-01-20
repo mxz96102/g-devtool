@@ -3,3 +3,4 @@ yarn.lock
 .vscode
 devtools.crx
 devtools.pem
+.DS_Store

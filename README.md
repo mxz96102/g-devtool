@@ -12,6 +12,8 @@
 
 ### Connect with G Canvas;
 
+#### In Native G Usage
+
 ```javascript
 // init window hook
 window.__g_instances__ = [];
@@ -20,6 +22,51 @@ var canvas = new Canvas({...blablabla});
 
 window.__g_instances__.push(canvas);
 
+```
+
+#### In G6
+
+```javascript
+// init window hook
+window.__g_instances__ = [];
+
+var canvas = graph.get("canvas");
+
+window.__g_instances__.push(canvas);
+
+```
+
+
+#### In G2
+
+```javascript
+// init window hook
+window.__g_instances__ = [];
+
+var canvas = chart.canvas;
+
+window.__g_instances__.push(canvas);
+
+```
+
+#### In S2
+
+```javascript
+window.__g_instances__ = [];
+
+// in native 
+var canvas = spreadSheet.container;
+
+window.__g_instances__.push(canvas);
+
+
+// in S2 react
+<SpreadSheet
+  {...blablabla}
+  getSpreadSheet={(sp) => {
+            window.__g_instances__ = [sp.container]
+          }}
+          />
 ```
 
 ### Using devtool

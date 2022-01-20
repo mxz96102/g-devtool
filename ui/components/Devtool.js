@@ -4,12 +4,10 @@ import GTree from './GTree';
 
 const Devtool = (props) => {
   const { data = [], actions={} } = props;
-  const [selectedData, setSelectedData] = useState();
-
-
+  const [selectedData, setSelectedData] = useState(data[0]);
 
   return <div>
-    <Select options={data.map((e, i) => ({
+    <Select defaultValue={0} options={data.map((e, i) => ({
       label: `Canvas ${i}`,
       value: i,
       info: e

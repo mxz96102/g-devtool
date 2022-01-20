@@ -2,28 +2,39 @@ const getGlobalInstanceScript = `
   (function () {
     var instances = window.__g_instances__;
     var gmap = {};
+    var getCanvasRootGroup = function (canvas) {
+      if (canvas.getRoot) {
+        return canvas.getRoot().getChildren()
+      } else if (canvas.getChildren) {
+        return canvas.getChildren()
+      }
+
+      return []
+    }
     window.__g_instances__.globalMap = gmap;
     var gInfo = [];
     function getGInstance (instance) {
       const ga = {}
-      if (instance.children) {
-        ga.children = instance.children.map(function (p) {return getGInstance(p)})
+      if (instance.getChildren && instance.getChildren()) {
+        ga.children = instance.getChildren().map(function (p) {return getGInstance(p)})
       } 
         ga.hash = Math.random().toString(16).slice(-8);
         gmap[ga.hash] = instance;
-        ga.id = instance.id;
-        ga.name = instance.name;
-        ga.type = instance.type;
-        ga.boundingBox = instance.getBoundingClientRect();
-        ga.element = instance.getBoundingClientRect();
-        ga.type = instance.nodeName;
+        ga.id = instance.id || instance.get('id');
+        ga.name = instance.name || instance.get('name');
+        ga.type = instance.get('type') || instance.nodeName || 'group';
         return ga;
     }
     
   
     if (instances && instances.length) {
      gInfo = instances.map(
-       function (instance) {return getGInstance(instance.getRoot())}
+       function (instance) {return {
+         type: 'renderer',
+         name: 'renderer',
+         nodeName: 'renderer',
+         children: getCanvasRootGroup(instance).map(e => getGInstance(e))
+       }}
      )
     } else {
       gInfo.length = 0
@@ -44,16 +55,16 @@ function setRect({
   left
 }) {
   if (nowRectId) {
-    chrome.devtools.inspectedWindow.eval(`document.getElementById("${nowRectId}").remove()`)
+    chrome.devtools.inspectedWindow.eval(`document.getElementById("${nowRectId}").remove()`);
   } else {
-    nowRectId = Math.random().toString(16).slice(-6)
+    nowRectId = Math.random().toString(16).slice(-6);
   }
 
   chrome.devtools.inspectedWindow.eval(`(function(){
     const el = document.createElement('div');
     el.id = '${nowRectId}'
     document.body.appendChild(el);
-    el.style.position = 'fixed';
+    el.style.position = 'absolute';
     el.style.width = '${width}px';
     el.style.height = '${height}px';
     el.style.top = '${top}px';
@@ -75,8 +86,20 @@ function cleanRect() {
 
 
 var showRect = (hash) => {
-  chrome.devtools.inspectedWindow.eval(`
-  window.__g_instances__.globalMap["${hash}"].getBoundingClientRect()
+  chrome.devtools.inspectedWindow.eval(`(function () {
+    var targetEl = window.__g_instances__.globalMap["${hash}"];
+    if (targetEl.getBoundingClientRect) {
+      return targetEl.getBoundingClientRect()
+    } else {
+      var bbox = targetEl.getCanvasBBox();
+      var target = targetEl.getCanvas().getClientByPoint(bbox.x, bbox.y);
+
+      bbox.left = target.x;
+      bbox.top = target.y;
+
+      return bbox;
+    }
+  })()
 `, (result) => {
   setRect(result || {})
 })
@@ -87,7 +110,7 @@ var lastSEl;
 var getAttrs = (hash) => new Promise((res) => {
   if (hash) {
     chrome.devtools.inspectedWindow.eval(`
-      window.__g_instances__.globalMap["${hash}"].attributes
+      window.__g_instances__.globalMap["${hash}"].attr()
     `, (result) => {
       res(result);
         chrome.devtools.inspectedWindow.eval(`
@@ -113,6 +136,5 @@ chrome.devtools.inspectedWindow.eval(getGlobalInstanceScript, function (gInfo, e
   const container = document.getElementById('container');
   // container.innerHTML = '';
   // container.appendChild(generateByInstance(gInfo.instance));
-  console.log(gInfo)
   mount(gInfo, container, { showRect, getAttrs, cleanRect, updateAttrs })
 })

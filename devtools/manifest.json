@@ -1,7 +1,7 @@
 {
   "name": "AntV G Dev Tool",
   "description": "devtool for g canvas",
-  "version": "0.1.1",
+  "version": "0.3.0",
   "devtools_page": "g_devtools.html",
   "minimum_chrome_version": "49",
   "manifest_version": 2,
