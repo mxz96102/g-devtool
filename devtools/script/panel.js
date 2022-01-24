@@ -1,140 +1,180 @@
-const getGlobalInstanceScript = `
-  (function () {
-    var instances = window.__g_instances__;
-    var gmap = {};
-    var getCanvasRootGroup = function (canvas) {
-      if (canvas.getRoot) {
-        return canvas.getRoot().getChildren()
-      } else if (canvas.getChildren) {
-        return canvas.getChildren()
+//
+// script execute function
+//
+
+// execute raw script in inspect window
+var executeScriptInInspectWindow = function (script) {
+  return new Promise(function (resolve, reject) {
+    chrome.devtools.inspectedWindow.eval(script, function (result, exception) {
+      if (exception) {
+        reject(exception);
+      } else {
+        resolve(result);
       }
+    });
+  });
+};
 
-      return []
+// execute function in anynomous code block
+var executeFuntionInInspectWindow = function (func, args) {
+  return executeScriptInInspectWindow(
+    `(${func.toString()}).apply(window, ${JSON.stringify(args)})`
+  );
+};
+
+//
+// these are the function that execute in inspect window
+//
+
+// get global G Canvas structure
+function getGlobalInstances() {
+  var instances = window.__g_instances__;
+  var gmap = {};
+  var getCanvasRootGroup = function (canvas) {
+    if (canvas.getRoot) {
+      return canvas.getRoot().getChildren();
+    } else if (canvas.getChildren) {
+      return canvas.getChildren();
     }
-    window.__g_instances__.globalMap = gmap;
-    var gInfo = [];
-    function getGInstance (instance) {
-      const ga = {}
-      if (instance.getChildren && instance.getChildren()) {
-        ga.children = instance.getChildren().map(function (p) {return getGInstance(p)})
-      } 
-        ga.hash = Math.random().toString(16).slice(-8);
-        gmap[ga.hash] = instance;
-        ga.id = instance.id || instance.get('id');
-        ga.name = instance.name || instance.get('name');
-        ga.type = instance.get('type') || instance.nodeName || 'group';
-        return ga;
+
+    return [];
+  };
+  window.__g_instances__.globalMap = gmap;
+  var gInfo = [];
+  function getGInstance(instance) {
+    const ga = {};
+    if (instance.getChildren && instance.getChildren()) {
+      ga.children = instance.getChildren().map(function (p) {
+        return getGInstance(p);
+      });
     }
-    
-  
-    if (instances && instances.length) {
-     gInfo = instances.map(
-       function (instance) {return {
-         type: 'renderer',
-         name: 'renderer',
-         nodeName: 'renderer',
-         children: getCanvasRootGroup(instance).map(e => getGInstance(e))
-       }}
-     )
-    } else {
-      gInfo.length = 0
-    }
-    
-    return gInfo;
-  })()
-`
+    ga.hash = Math.random().toString(16).slice(-8);
+    gmap[ga.hash] = instance;
+    ga.id = instance.id || instance.get("id");
+    ga.name = instance.name || instance.get("name");
+    ga.type = instance.get("type") || instance.nodeName || "group";
+    return ga;
+  }
 
-var nowRectId;
-
-var selectEl;
-
-function setRect({
-  width,
-  height,
-  top,
-  left
-}) {
-  if (nowRectId) {
-    chrome.devtools.inspectedWindow.eval(`document.getElementById("${nowRectId}").remove()`);
+  if (instances && instances.length) {
+    gInfo = instances.map(function (instance) {
+      var ga = {
+        type: "renderer",
+        name: "renderer",
+        nodeName: "renderer",
+        hash: Math.random().toString(16).slice(-8),
+        children: getCanvasRootGroup(instance).map((e) => getGInstance(e)),
+      };
+      gmap[ga.hash] = instance;
+      return ga;
+    });
   } else {
-    nowRectId = Math.random().toString(16).slice(-6);
+    gInfo.length = 0;
   }
 
-  chrome.devtools.inspectedWindow.eval(`(function(){
-    const el = document.createElement('div');
-    el.id = '${nowRectId}'
-    document.body.appendChild(el);
-    el.style.position = 'absolute';
-    el.style.width = '${width}px';
-    el.style.height = '${height}px';
-    el.style.top = '${top}px';
-    el.style.left = '${left}px';
-    el.style.background = 'rgba(135, 59, 244, 0.5)';
-    el.style.border = '1px solid rgb(135, 59, 244)';
-    el.style.boxSizing = 'border-box'
-  })()`)
-
+  return gInfo;
 }
 
-function cleanRect() {
-  if (nowRectId) {
-    chrome.devtools.inspectedWindow.eval(`document.getElementById("${nowRectId}").remove()`)
+function createBoxUsingId(bbox, id, color) {
+  var el = document.createElement("div");
+  window[id] = el;
+  document.body.appendChild(el);
+  el.style.position = "absolute";
+  el.style.width = `${bbox.width}px`;
+  el.style.height = `${bbox.height}px`;
+  el.style.top = `${bbox.top}px`;
+  el.style.left = `${bbox.left}px`;
+  el.style.background = color || "rgba(135, 59, 244, 0.5)";
+  el.style.border = "2px dashed rgb(135, 59, 244)";
+  el.style.boxSizing = "border-box";
+}
+
+function removeBoxUsingId(id) {
+  if (window[id]) {
+    window[id].remove();
   }
-  nowRectId = undefined;
 }
 
+function getElemetBBoxByHash(hash) {
+  var targetEl = window.__g_instances__.globalMap[hash];
+  if (targetEl.getBoundingClientRect) {
+    return targetEl.getBoundingClientRect();
+  }
+  var bbox = targetEl.getCanvasBBox();
+  var target = targetEl.getCanvas().getClientByPoint(bbox.x, bbox.y);
 
+  bbox.left = target.x;
+  bbox.top = target.y;
 
-var showRect = (hash) => {
-  chrome.devtools.inspectedWindow.eval(`(function () {
-    var targetEl = window.__g_instances__.globalMap["${hash}"];
-    if (targetEl.getBoundingClientRect) {
-      return targetEl.getBoundingClientRect()
-    } else {
-      var bbox = targetEl.getCanvasBBox();
-      var target = targetEl.getCanvas().getClientByPoint(bbox.x, bbox.y);
-
-      bbox.left = target.x;
-      bbox.top = target.y;
-
-      return bbox;
-    }
-  })()
-`, (result) => {
-  setRect(result || {})
-})
+  return bbox;
 }
 
-var lastSEl;
+function getElementAttrByHash(hash) {
+  return window.__g_instances__.globalMap[hash].attr();
+}
 
-var getAttrs = (hash) => new Promise((res) => {
+function setElementAttrByHash(hash, name, value) {
+  return window.__g_instances__.globalMap[hash].attr(name, value);
+}
+
+function setGElementByHash(hash) {
+  window.$gElemet = hash ? window.__g_instances__.globalMap[hash] : undefined;
+}
+
+function consoleElementByHash(hash, desc) {
+  window.console.log(
+    desc || "<Click To Expand>",
+    window.__g_instances__.globalMap[hash]
+  );
+}
+
+//
+// these are the functions that run in devtools panel
+//
+
+function setRect(bbox, id, color) {
+  executeFuntionInInspectWindow(removeBoxUsingId, [id]).finally(() => {
+    executeFuntionInInspectWindow(createBoxUsingId, [bbox, id, color]);
+  });
+}
+
+function cleanRect(id) {
+  executeFuntionInInspectWindow(removeBoxUsingId, [id]);
+}
+
+function showRect(hash, id, color) {
+  executeFuntionInInspectWindow(getElemetBBoxByHash, [hash]).then((bbox) => {
+    setRect(bbox, id, color);
+  });
+}
+
+function getAttrs(hash) {
   if (hash) {
-    chrome.devtools.inspectedWindow.eval(`
-      window.__g_instances__.globalMap["${hash}"].attr()
-    `, (result) => {
-      res(result);
-        chrome.devtools.inspectedWindow.eval(`
-        $gElement = window.__g_instances__.globalMap["${hash}"]
-      `)
-    
-      
-    })
-  } else {
-    chrome.devtools.inspectedWindow.eval(`
-    $gElement = undefined`)
-    res()
+    executeFuntionInInspectWindow(setGElementByHash, [hash]);
+    return executeFuntionInInspectWindow(getElementAttrByHash, [hash]);
   }
-  
-})
+  return executeFuntionInInspectWindow(setGElementByHash, []);
+}
 
-var updateAttrs = (hash, name, attrs, bb) =>  chrome.devtools.inspectedWindow.eval(`
-window.__g_instances__.globalMap["${hash}"].attr("${name}", ${JSON.stringify(attrs)})
-`)
+function updateAttrs(hash, name, attrs) {
+  return executeFuntionInInspectWindow(setElementAttrByHash, [
+    hash,
+    name,
+    attrs,
+  ]);
+}
 
+function consoleEl(hash, desc) {
+  return executeFuntionInInspectWindow(consoleElementByHash, [hash, desc]);
+}
 
-chrome.devtools.inspectedWindow.eval(getGlobalInstanceScript, function (gInfo, err) {
-  const container = document.getElementById('container');
-  // container.innerHTML = '';
-  // container.appendChild(generateByInstance(gInfo.instance));
-  mount(gInfo, container, { showRect, getAttrs, cleanRect, updateAttrs })
-})
+executeFuntionInInspectWindow(getGlobalInstances).then(function (data) {
+  const container = document.getElementById("container");
+  mount(data, container, {
+    showRect,
+    getAttrs,
+    cleanRect,
+    updateAttrs,
+    consoleEl,
+  });
+});

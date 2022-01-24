@@ -77,6 +77,13 @@ const GTree = (props) => {
   const { data, actions = {} } = props;
   const [selectedKey, setSelected] = useState();
 
+  useEffect(() => {
+    actions.showRect(selectedKey, '__g_select__', 'rgba(29, 57, 196, 0.5)');
+    return () => {
+      actions.cleanRect('__g_select__')
+    }
+  }, [selectedKey])
+
   if (!data) {
     return <Empty />;
   }
@@ -93,10 +100,10 @@ const GTree = (props) => {
         titleRender={(node) => (
           <div
             onMouseEnter={() => {
-              actions.showRect(node.key);
+              actions.showRect(node.key, '__g_hover__');
             }}
             onMouseLeave={() => {
-              actions.cleanRect();
+              actions.cleanRect('__g_hover__');
             }}
           >
             <Space>
