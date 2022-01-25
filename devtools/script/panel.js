@@ -48,7 +48,14 @@ function getGlobalInstances() {
         return getGInstance(p);
       });
     }
-    ga.hash = Math.random().toString(16).slice(-8);
+
+    if (!instance.__dev_hash) {
+      ga.hash = Math.random().toString(16).slice(-8);
+      instance.__dev_hash = ga.hash;      
+    } else {
+      ga.hash = instance.__dev_hash;
+    }
+
     gmap[ga.hash] = instance;
     ga.id = instance.id || instance.get("id");
     ga.name = instance.name || instance.get("name");
@@ -75,9 +82,14 @@ function getGlobalInstances() {
   return gInfo;
 }
 
+function checkCanvasByHash(hash) {
+  return !!window.__g_instances__.globalMap[hash];
+}
+
 function createBoxUsingId(bbox, id, color) {
   var el = document.createElement("div");
   window[id] = el;
+  el.classList.add('g_devtool_rect')
   document.body.appendChild(el);
   el.style.position = "absolute";
   el.style.width = `${bbox.width}px`;
@@ -93,6 +105,13 @@ function removeBoxUsingId(id) {
   if (window[id]) {
     window[id].remove();
   }
+}
+
+function removeAllBox() {
+  var elements = document.getElementsByClassName('g_devtool_rect');
+  [].forEach.apply(elements, [function (e) {
+    e.remove();
+  }])
 }
 
 function getElemetBBoxByHash(hash) {
@@ -148,6 +167,10 @@ function showRect(hash, id, color) {
   });
 }
 
+function cleanAllRect() {
+  executeFuntionInInspectWindow(removeAllBox);
+}
+
 function getAttrs(hash) {
   if (hash) {
     executeFuntionInInspectWindow(setGElementByHash, [hash]);
@@ -168,7 +191,21 @@ function consoleEl(hash, desc) {
   return executeFuntionInInspectWindow(consoleElementByHash, [hash, desc]);
 }
 
-executeFuntionInInspectWindow(getGlobalInstances).then(function (data) {
+function checkCanvasAlive(hash) {
+  return executeFuntionInInspectWindow(checkCanvasByHash, [hash]).then(
+    res => {
+      if (res) {
+        return true
+      } else {
+        return false
+      }
+    }
+  )
+}
+
+function getNowCanvasData() {return executeFuntionInInspectWindow(getGlobalInstances)}
+
+getNowCanvasData().then(function (data) {
   const container = document.getElementById("container");
   mount(data, container, {
     showRect,
@@ -176,5 +213,8 @@ executeFuntionInInspectWindow(getGlobalInstances).then(function (data) {
     cleanRect,
     updateAttrs,
     consoleEl,
+    checkCanvasAlive,
+    getNowCanvasData,
+    cleanAllRect
   });
 });

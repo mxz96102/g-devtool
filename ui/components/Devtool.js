@@ -1,10 +1,37 @@
-import React, { useState } from "react";
-import { Row, Select, Col, Button, Tooltip } from "antd";
+import React, { useState, useEffect } from "react";
+import { Row, Select, Col, Button, Tooltip, Tag } from "antd";
 import { CodeOutlined } from "@ant-design/icons";
 import GTree from "./GTree";
 
 const HeadBar = (props) => {
-  const { data, setSelectedData, actions, selectedData } = props;
+  const { data, setSelectedData, actions, selectedData, setData } = props;
+  const [canvasAlive, setCanvasAlive] = useState(true);
+  
+  useEffect(() => {
+    const itv = setInterval(() => {
+      actions.checkCanvasAlive(selectedData.hash).then(
+        res => {
+          setCanvasAlive(res);
+        }
+      )
+    }, 1000);
+
+    return () => {
+      clearInterval(itv)
+    }
+  }, [actions, setData, selectedData]);
+
+  useEffect(() => {
+    if (!canvasAlive) {
+      actions.getNowCanvasData().then(d => {
+        if (d) {
+          setData(d);
+          setSelectedData(d[0])
+        }
+      })
+    }
+  }, [canvasAlive])
+
   return (
     <Row
       style={{
@@ -32,6 +59,11 @@ const HeadBar = (props) => {
           style={{ width: "100%" }}
         />
       </Col>
+      {
+        canvasAlive ? <Col><Tag color="green">ALIVE</Tag></Col> : <Col>
+          <Tag color="red">DEAD</Tag><span>Trying to reconnect</span>
+        </Col>
+      }
       <Col flex={1}></Col>
       <Col>
         <Button
@@ -51,8 +83,15 @@ const HeadBar = (props) => {
 };
 
 const Devtool = (props) => {
-  const { data = [], actions = {} } = props;
-  const [selectedData, setSelectedData] = useState(data[0]);
+  const { data: initData = [] , actions = {} } = props;
+  const [selectedData, setSelectedData] = useState(initData[0]);
+  const [data, setData] = useState(initData);
+
+  useEffect(() => {
+    return () => {
+      actions.cleanAllRect()
+    }
+  }, [])
 
   return (
     <div>
@@ -61,6 +100,7 @@ const Devtool = (props) => {
         setSelectedData={setSelectedData}
         selectedData={selectedData}
         actions={actions}
+        setData={setData}
       />
       <GTree actions={actions} data={selectedData} />
     </div>
