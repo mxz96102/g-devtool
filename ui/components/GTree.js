@@ -56,7 +56,9 @@ const buildTreeData = (data = {}, isRoot) => {
     key: data.hash,
     name: data.name,
     id: data.id,
-    hash: data.hash
+    hash: data.hash,
+    count: data.count,
+    num: data.children?.length || 0
   };
 
   if (data.children) {
@@ -96,7 +98,7 @@ const GTree = (props) => {
         selectedKeys={[selectedKey]}
         onSelect={(keys) => setSelected(keys[0])}
         showLine={{ showLeafIcon: false }}
-        height={document.body.clientHeight}
+        height={document.body.clientHeight - 45}
         titleRender={(node) => (
           <div
             onMouseEnter={() => {
@@ -119,6 +121,11 @@ const GTree = (props) => {
                   id:{node.id}
                 </Typography.Text>
               )}
+              {
+                node.num > 0 &&  <Typography.Text type="secondary">
+                  ({node.num} children / {node.count || 0} descendants)
+                </Typography.Text>
+              }
             </Space>
           </div>
         )}

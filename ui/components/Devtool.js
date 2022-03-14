@@ -1,44 +1,92 @@
 import React, { useState, useEffect } from "react";
-import { Row, Select, Col, Button, Tooltip, Tag } from "antd";
+import { Row, Select, Col, Button, Tooltip, Tag, Skeleton, Empty } from "antd";
 import { CodeOutlined } from "@ant-design/icons";
 import GTree from "./GTree";
 
+const countTree = (tree) => {
+  if (!tree) {
+    return 0;
+  }
+  const count = tree?.children?.reduce((a, b) => a + countTree(b), 1) || 1;
+  tree.count = count;
+  return count;
+};
+
+export function convertMemoryUnit(number, digits = 2) {
+  let value;
+  let unit;
+  if (number > 1000000000) {
+    unit = 'GB';
+    value = number / 1000000000;
+  } else if (number > 1000000) {
+    unit = 'MB';
+    value = number / 1000000;
+  } else if (number > 1000) {
+    unit = 'KB';
+    value = number / 1000;
+  } else {
+    unit = 'B';
+    value = number;
+  }
+  value = value && value % 1 !== 0 ? value.toFixed(digits) : value;
+  return value + unit;
+}
+
+
 const HeadBar = (props) => {
-  const { data, setSelectedData, actions, selectedData, setData } = props;
+  const {
+    data,
+    setSelectedHash,
+    actions,
+    selectedData,
+    setData,
+    selectedHash,
+  } = props;
   const [canvasAlive, setCanvasAlive] = useState(true);
-  
+
   useEffect(() => {
     const itv = setInterval(() => {
-      actions.checkCanvasAlive(selectedData.hash).then(
-        res => {
-          setCanvasAlive(res);
+      actions.checkCanvasAlive(selectedHash).then((res) => {
+        setCanvasAlive(res);
+        if (res) {
+          actions.getNowCanvasData().then((d) => {
+            if (d) {
+              setData(d);
+            }
+          });
         }
-      )
+      });
     }, 1000);
 
     return () => {
-      clearInterval(itv)
-    }
+      clearInterval(itv);
+    };
   }, [actions, setData, selectedData]);
 
   useEffect(() => {
     if (!canvasAlive) {
-      actions.getNowCanvasData().then(d => {
+      actions.getNowCanvasData().then((d) => {
         if (d) {
           setData(d);
-          setSelectedData(d[0])
+          setSelectedHash(d[0].hash);
         }
-      })
+      });
     }
-  }, [canvasAlive])
+  }, [canvasAlive]);
 
   return (
     <Row
+    align="middle"
       style={{
         padding: 2,
         marginBottom: 6,
         borderBottom: "1px solid #ddd",
         background: "rgba(0, 0, 0, 0.05)",
+        position: "fixed",
+        width: "100%",
+        top: 0,
+        left: 0,
+        zIndex: 999,
       }}
       gutter={[12, 12]}
     >
@@ -49,21 +97,30 @@ const HeadBar = (props) => {
           defaultValue={0}
           options={data.map((e, i) => ({
             label: `Canvas ${i}`,
-            value: i,
+            value: e.hash,
             info: e,
           }))}
-          onChange={(_, opt) => {
-            setSelectedData(opt ? opt.info : undefined);
+          value={selectedHash}
+          onChange={(val) => {
+            setSelectedHash(val);
           }}
           placeholder="Choose a canvas to inspect"
           style={{ width: "100%" }}
         />
       </Col>
-      {
-        canvasAlive ? <Col><Tag color="green">ALIVE</Tag></Col> : <Col>
-          <Tag color="red">DEAD</Tag><span>Trying to reconnect</span>
+      {canvasAlive ? (
+        <Col>
+          <Tag color="green">ALIVE</Tag>
         </Col>
-      }
+      ) : (
+        <Col>
+          <Tag color="red">DEAD</Tag>
+          <span>Trying to reconnect</span>
+        </Col>
+      )}
+      {selectedData && <Col>{selectedData?.count} Shapes</Col>}
+      {selectedData?.memory > 0 && <Col>HeapMemory:{convertMemoryUnit(selectedData.memory)}</Col>}
+      {selectedData?.fps > 0 && <Col>FPS: {selectedData?.fps}</Col>}
       <Col flex={1}></Col>
       <Col>
         <Button
@@ -83,26 +140,47 @@ const HeadBar = (props) => {
 };
 
 const Devtool = (props) => {
-  const { data: initData = [] , actions = {} } = props;
+  const { data: initData = [], actions = {} } = props;
   const [selectedData, setSelectedData] = useState(initData[0]);
+  const [selectedHash, setSelectedHash] = useState(initData[0].hash);
   const [data, setData] = useState(initData);
 
   useEffect(() => {
     return () => {
-      actions.cleanAllRect()
-    }
-  }, [])
+      actions.cleanAllRect();
+      actions.startFPSMonitor();
+    };
+  }, [selectedHash]);
+
+  useEffect(() => {
+    const target = data.find((e) => e.hash === selectedHash);
+    countTree(target);
+    setSelectedData(target);
+  }, [selectedHash, data]);
 
   return (
     <div>
       <HeadBar
         data={data}
-        setSelectedData={setSelectedData}
+        setSelectedHash={setSelectedHash}
         selectedData={selectedData}
+        selectedHash={selectedHash}
         actions={actions}
         setData={setData}
       />
-      <GTree actions={actions} data={selectedData} />
+      <div
+        style={{
+          marginTop: 48,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {selectedData ? (
+          <GTree actions={actions} data={selectedData} />
+        ) : (
+          <Empty />
+        )}
+      </div>
     </div>
   );
 };

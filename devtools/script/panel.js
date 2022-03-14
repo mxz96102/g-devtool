@@ -26,6 +26,30 @@ var executeFuntionInInspectWindow = function (func, args) {
 // these are the function that execute in inspect window
 //
 
+function doFPSThings() {
+  if (window.__g_fps) {
+    cancelAnimationFrame(window.__g_fps);
+  }
+  let lastCalledTime;
+  let fps;
+  let delta;
+
+  function requestAnimFrame() {
+    if (!lastCalledTime) {
+      lastCalledTime = performance.now();
+      fps = 0;
+    } else {
+      delta = (performance.now() - lastCalledTime) / 1000;
+      lastCalledTime = performance.now();
+      fps = 1 / delta;
+    }
+    window.__g_fps_value = Math.round(fps);
+    window.__g_fps = requestAnimationFrame(requestAnimFrame);
+  }
+
+  requestAnimFrame();
+}
+
 // get global G Canvas structure
 function getGlobalInstances() {
   var instances = window.__g_instances__;
@@ -51,7 +75,7 @@ function getGlobalInstances() {
 
     if (!instance.__dev_hash) {
       ga.hash = Math.random().toString(16).slice(-8);
-      instance.__dev_hash = ga.hash;      
+      instance.__dev_hash = ga.hash;
     } else {
       ga.hash = instance.__dev_hash;
     }
@@ -65,13 +89,17 @@ function getGlobalInstances() {
 
   if (instances && instances.length) {
     gInfo = instances.map(function (instance) {
+      var hash = instance.hash || Math.random().toString(16).slice(-8);
       var ga = {
         type: "renderer",
         name: "renderer",
         nodeName: "renderer",
-        hash: Math.random().toString(16).slice(-8),
+        hash: hash,
         children: getCanvasRootGroup(instance).map((e) => getGInstance(e)),
+        memory: window.performance.memory.usedJSHeapSize,
+        fps: window.__g_fps_value
       };
+      instance.hash = ga.hash;
       gmap[ga.hash] = instance;
       return ga;
     });
@@ -83,13 +111,13 @@ function getGlobalInstances() {
 }
 
 function checkCanvasByHash(hash) {
-  return !!window.__g_instances__.globalMap[hash];
+  return !!window.__g_instances__.map((e) => e.hash).includes(hash);
 }
 
 function createBoxUsingId(bbox, id, color) {
   var el = document.createElement("div");
   window[id] = el;
-  el.classList.add('g_devtool_rect')
+  el.classList.add("g_devtool_rect");
   document.body.appendChild(el);
   el.style.position = "absolute";
   el.style.width = `${bbox.width}px`;
@@ -108,10 +136,12 @@ function removeBoxUsingId(id) {
 }
 
 function removeAllBox() {
-  var elements = document.getElementsByClassName('g_devtool_rect');
-  [].forEach.apply(elements, [function (e) {
-    e.remove();
-  }])
+  var elements = document.getElementsByClassName("g_devtool_rect");
+  [].forEach.apply(elements, [
+    function (e) {
+      e.remove();
+    },
+  ]);
 }
 
 function getElemetBBoxByHash(hash) {
@@ -193,17 +223,22 @@ function consoleEl(hash, desc) {
 
 function checkCanvasAlive(hash) {
   return executeFuntionInInspectWindow(checkCanvasByHash, [hash]).then(
-    res => {
+    (res) => {
       if (res) {
-        return true
+        return true;
       } else {
-        return false
+        return false;
       }
     }
-  )
+  );
 }
 
-function getNowCanvasData() {return executeFuntionInInspectWindow(getGlobalInstances)}
+function getNowCanvasData() {
+  return executeFuntionInInspectWindow(getGlobalInstances);
+}
+function startFPSMonitor() {
+  return executeFuntionInInspectWindow(doFPSThings);
+}
 
 getNowCanvasData().then(function (data) {
   const container = document.getElementById("container");
@@ -215,6 +250,9 @@ getNowCanvasData().then(function (data) {
     consoleEl,
     checkCanvasAlive,
     getNowCanvasData,
-    cleanAllRect
+    cleanAllRect,
+    startFPSMonitor
   });
 });
+
+startFPSMonitor()
