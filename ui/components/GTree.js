@@ -5,6 +5,7 @@ import {
   BlockOutlined,
   PrinterOutlined,
   AppstoreOutlined,
+  CodeOutlined,
 } from "@ant-design/icons";
 
 const iconMap = {
@@ -13,7 +14,7 @@ const iconMap = {
   shape: <AppstoreOutlined />,
 };
 
-const AttrsDrawer = ({ hash, getAttrs, onCancel, updateAttrs }) => {
+const AttrsDrawer = ({ hash, getAttrs, onCancel, updateAttrs, actions }) => {
   const [val, setVal] = useState(hash);
   const change = (all) => {
     const { updated_src, namespace, name } = all;
@@ -37,7 +38,16 @@ const AttrsDrawer = ({ hash, getAttrs, onCancel, updateAttrs }) => {
   }, [hash]);
 
   return (
-    <Drawer mask={false} onClose={onCancel} visible={hash}>
+    <Drawer
+      mask={false}
+      onClose={onCancel}
+      visible={hash}
+      extra={
+        <Space>
+          <CodeOutlined onClick={() => actions.consoleEl(hash)} />
+        </Space>
+      }
+    >
       <ReactJson
         style={{ fontSize: 12 }}
         onAdd={change}
@@ -58,7 +68,9 @@ const buildTreeData = (data = {}, isRoot) => {
     id: data.id,
     hash: data.hash,
     count: data.count,
-    num: data.children?.length || 0
+    num: data.children?.length || 0,
+    rect: data.rect,
+    position: data.position
   };
 
   if (data.children) {
@@ -66,10 +78,10 @@ const buildTreeData = (data = {}, isRoot) => {
   }
 
   if (isRoot) {
-    node.type = 'renderer';
-    node.title = 'renderer';
-    node.key = 'renderer'
-    return node
+    node.type = "renderer";
+    node.title = "renderer";
+    node.key = "renderer";
+    return node;
   }
 
   return node;
@@ -80,11 +92,11 @@ const GTree = (props) => {
   const [selectedKey, setSelected] = useState();
 
   useEffect(() => {
-    actions.showRect(selectedKey, '__g_select__', 'rgba(29, 57, 196, 0.5)');
+    actions.showRect(selectedKey, "__g_select__", "rgba(29, 57, 196, 0.5)");
     return () => {
-      actions.cleanRect('__g_select__')
-    }
-  }, [selectedKey])
+      actions.cleanRect("__g_select__");
+    };
+  }, [selectedKey]);
 
   if (!data) {
     return <Empty />;
@@ -102,10 +114,10 @@ const GTree = (props) => {
         titleRender={(node) => (
           <div
             onMouseEnter={() => {
-              actions.showRect(node.key, '__g_hover__');
+              actions.showRect(node.key, "__g_hover__");
             }}
             onMouseLeave={() => {
-              actions.cleanRect('__g_hover__');
+              actions.cleanRect("__g_hover__");
             }}
           >
             <Space>
@@ -117,15 +129,23 @@ const GTree = (props) => {
                 </Typography.Text>
               )}
               {node.id && (
-                <Typography.Text type="secondary">
-                  id:{node.id}
-                </Typography.Text>
+                <Typography.Text type="secondary">id:{node.id}</Typography.Text>
               )}
-              {
-                node.num > 0 &&  <Typography.Text type="secondary">
+              {node.num > 0 && (
+                <Typography.Text type="secondary">
                   ({node.num} children / {node.count || 0} descendants)
                 </Typography.Text>
-              }
+              )}
+              {node.rect && (
+                <Typography.Text type="secondary">
+                  clientX: {node.rect.x} clientY: {node.rect.y}
+                </Typography.Text>
+              )}
+              {node.position && (
+                <Typography.Text type="secondary">
+                  x: {node.position[0]} y: {node.position[1]}
+                </Typography.Text>
+              )}
             </Space>
           </div>
         )}
@@ -136,6 +156,7 @@ const GTree = (props) => {
         onCancel={() => setSelected()}
         getAttrs={actions.getAttrs}
         updateAttrs={actions.updateAttrs}
+        actions={actions}
       />
     </div>
   );

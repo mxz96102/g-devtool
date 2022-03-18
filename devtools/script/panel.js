@@ -84,6 +84,8 @@ function getGlobalInstances() {
     ga.id = instance.id || instance.get("id");
     ga.name = instance.name || instance.get("name");
     ga.type = instance.get("type") || instance.nodeName || "group";
+    ga.rect = instance.getBoundingClientRect()
+    ga.position = instance.getPosition();
     return ga;
   }
 
@@ -97,7 +99,7 @@ function getGlobalInstances() {
         hash: hash,
         children: getCanvasRootGroup(instance).map((e) => getGInstance(e)),
         memory: window.performance.memory.usedJSHeapSize,
-        fps: window.__g_fps_value
+        fps: window.__g_fps_value,
       };
       instance.hash = ga.hash;
       gmap[ga.hash] = instance;
@@ -167,7 +169,7 @@ function setElementAttrByHash(hash, name, value) {
 }
 
 function setGElementByHash(hash) {
-  window.$gElemet = hash ? window.__g_instances__.globalMap[hash] : undefined;
+  window.$gElemet = window.__g_instances__.globalMap[hash];
 }
 
 function consoleElementByHash(hash, desc) {

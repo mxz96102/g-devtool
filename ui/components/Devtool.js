@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Row, Select, Col, Button, Tooltip, Tag, Skeleton, Empty } from "antd";
+import { Row, Select, Col, Button, Tooltip, Tag, Empty } from "antd";
 import { CodeOutlined } from "@ant-design/icons";
 import GTree from "./GTree";
 
